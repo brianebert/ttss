@@ -1,0 +1,20 @@
+{
+  "name": "ttss",
+  "version": "1.0.0",
+  "description": "test @brianebert/tss",
+  "main": "testTss.js",
+  "type": "module",
+  "scripts": {
+    "test": "node testTss.js"
+  },
+  "keywords": [
+    "brianebert",
+    "tss"
+  ],
+  "author": "Brian Ebert",
+  "license": "ISC",
+  "dependencies": {
+    "@brianebert/tss": "^1.0.0",
+    "toml": "^3.0.0"
+  }
+}
