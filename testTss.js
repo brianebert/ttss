@@ -2,6 +2,8 @@ import {SigningAccount, COL_Node} from "@brianebert/tss";
 import * as toml from "toml";
 import * as fs from 'fs';
 
+COL_Node.cache.readFrom = false;
+
 const {TA_0, TS_0, TA_1, TS_1} = toml.parse(fs.readFileSync('app.toml', 'utf8'));
 
 async function makeGraph(keys){
@@ -32,7 +34,7 @@ async function asymetricKeyTest(signingAccount, shareWith){
   console.log(`made new graph: `, graph.g00.value);
 
   let traversed = await COL_Node.traverse(graph.g00.cid, (instance)=>{
-    console.log(`called app function 0 on ${instance.name}, address: ${instance.cid.toString()}, value: `, instance.value);
+    console.log(`called app function 0 on ${instance.name}, address: ${instance.cid.toString()}, value: `);
   }, rKeys);
   console.log(`traversed new graph, head ${traversed.cid.toString()} `, traversed.value);
 
@@ -41,7 +43,7 @@ async function asymetricKeyTest(signingAccount, shareWith){
   let head = await graph.g30.update(value, wKeys);
 console.log(`updated graph to head ${head.cid.toString()}: `, head.value);
   traversed = await COL_Node.traverse(head.cid, (instance)=>{
-    console.log(`called app function 1 on ${instance.name}, address: ${instance.cid.toString()}, value: `, instance.value);
+    console.log(`called app function 1 on ${instance.name}, address: ${instance.cid.toString()}, value: `);
   }, rKeys);
 //throw new Error(`let's stop here!`)
   head = await graph.g20.delete(wKeys);
@@ -57,14 +59,14 @@ async function sharedKeyTest(signingAccount, shareWith){
   const shk = await signingAccount.sharedKeys(shareWith.account.id, 'libsodium_kx_pk');
   const keys = {shared: shk.tx};
   const graph = await makeGraph(keys);
-  console.log(`made new graph: `, await COL_Node.traverse(graph.g00.cid, keys));
+  console.log(`made new graph: `, await COL_Node.traverse(graph.g00.cid, (instance)=>{console.log(`called app function 0 on ${instance.name}`)}, keys));
 
   let value = Object.assign({}, graph.g30.value);
   value['keyType'] = 'shared';
-  let head = await graph.g30.update(value, wKeys);
+  let head = await graph.g30.update(value, keys);
 
   head = await graph.g20.delete(keys);
-
+let traversed = await COL_Node.traverse(head.cid, (instance)=>{console.log(`called app function 1 on ${instance.name}`)}, keys);
   return head
 }
 
@@ -93,14 +95,14 @@ async function initSigningAccount(address=null, sk=null){
 }
 
 async function testCols(){
+  const sA0 = await initSigningAccount(TA_0, TS_0);
   const sA1 = await initSigningAccount(TA_1, TS_1);
 
-  /*if(sA1 instanceof SigningAccount)
+  if(sA1 instanceof SigningAccount)
     await asymetricKeyTest(sA1);
   else
     console.error(`initSigningAccount returned: `, sA1);
-  */
-  const sA0 = await initSigningAccount(TA_0, TS_0);
+  
 
   const pk = await SigningAccount.dataEntry(sA0, 'libsodium_box_pk');
   const message = new COL_Node({colName: 'private message', message:`hi, ${sA0.account.id} at ${new Date().toUTCString()}!`});
@@ -108,12 +110,12 @@ async function testCols(){
   const receipt0 = await sA1.messengerTx(message.cid, sA0.account.id, 'MessageMe');
   console.log(`MessageMe transaction ${receipt0.hash} created at ${receipt0.created_at} carries memo ${receipt0.memo} `);
 
-  const oldMsgs = await sA0.watcher.start(sA0, nodes => console.log(`received message(s): `, nodes));
-throw new Error(`Stopping before sharedKeyTest()`)
+  const oldMsgs = await sA0.watcher.start(sA0, nodes => console.log(`received ${nodes.length} message(s): `, nodes));
+console.log(`old messages are: `, oldMsgs);
   const sharedData = await sharedKeyTest(sA1, sA0);
-
   let receipt1 = await sA1.messengerTx(sharedData.cid, sA0.account.id, 'ShareData');
-  console.log(`ShareData transaction result is: `, receipt1);
+  console.log(`ShareData transaction ${receipt1.hash} created at ${receipt1.created_at} carries memo ${receipt1.memo} `);
+
 }
 
 testCols()
