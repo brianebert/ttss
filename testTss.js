@@ -55,7 +55,7 @@ async function asymetricKeyTest(signingAccount){
 
   // change value of leaf node and bubble hash changes to new graph head
   let value = Object.assign({}, graph.g30.value);
-  value['keyType'] = 'asymetric';
+  value['keyType'] = `asymetric ${new Date().toUTCString()}`;
   let head = await graph.g30.update(value, wKeys);
   console.log(`updated graph head ${head.cid.toString()}`);
   await showGraph(head, rKeys);
@@ -76,7 +76,7 @@ async function sharedKeyTest(signingAccount, shareWith){
   await showGraph(graph.g00, keys);
  
   let value = Object.assign({}, graph.g30.value);
-  value['keyType'] = 'shared';
+  value['keyType'] = `shared ${new Date().toUTCString()}`;
   let head = await graph.g30.update(value, keys);
   console.log(`updated graph head ${head.cid.toString()}`);
 
@@ -120,17 +120,15 @@ async function initSigningAccount(address=null, sk=null){
 async function readMessages(messages){
   for(const message of messages){
     switch(message.asset_code){
-    case 'MessageMe':{
+    case 'MessageMe':
       const pk = await SigningAccount.dataEntry(message.from, 'libsodium_box_pk');
       var keys = {reader: this.ec25519.sk, writer: pk};
       var node = await COL_Node.fromCID(SigningAccount.memoToCID(message.transaction.memo), keys);
-    }
       break;
-    case 'ShareData':{
+    case 'ShareData':
       const {rx, tx} = await this.sharedKeys(message.from, 'libsodium_kx_pk');
       var keys = {shared: rx};
       var node = await COL_Node.fromCID(SigningAccount.memoToCID(message.transaction.memo), keys);
-    }
       break;
     default:
       throw new Error(`wasn't expecting to get here`)
@@ -152,30 +150,25 @@ async function testCols(){
   const sA0 = await initSigningAccount(TA_0, TS_0);
   const sA1 = await initSigningAccount(TA_1, TS_1);
 
-  // create, encrypt and modify related nodes using asymetric keys
-  if(sA1 instanceof SigningAccount)
-    await asymetricKeyTest(sA1, sA0);
-  else
-    throw new Error(`initSigningAccount returned: `, sA1);
+  if(!(sA0 instanceof SigningAccount) || !(sA1 instanceof SigningAccount))
+    throw new Error(`failed to create signing accounts.`)
+
+  const pk = await SigningAccount.dataEntry(sA1, 'libsodium_box_pk');
+  const message = new COL_Node({colName: 'private message', message:`hi, ${abrevIt(sA1.account.id)} at ${new Date().toUTCString()}!`});
+  const result = await message.write('', {reader: pk, writer: sA0.ec25519.sk});
+  const receipt0 = await sA0.messengerTx(message.cid, sA1.account.id, 'MessageMe');
+  console.log(`sent transaction ${abrevIt(receipt0.hash)} created at ${receipt0.created_at} carries memo ${abrevIt(receipt0.memo)} `);
+
+  await asymetricKeyTest(sA1, sA0);
   console.log(`finished asymetricKeyTest()`);
+  
+  const waiting = await sA1.watcher.start(sA1, readMessages);
+  console.log(`SigningAccount ${abrevIt(sA1.account.id)} MessageWatcher found ${waiting.length} message(s) waiting`);
 
-  console.log(`encrypting messaging betweenb accounts ${abrevIt(sA1.account.id)} and ${abrevIt(sA0.account.id)}`);
-  const pk = await SigningAccount.dataEntry(sA0, 'libsodium_box_pk');
-  const message = new COL_Node({colName: 'private message', message:`hi, ${sA0.account.id} at ${new Date().toUTCString()}!`});
-  const result = await message.write('', {reader: pk, writer: sA1.ec25519.sk});
-  const receipt0 = await sA1.messengerTx(message.cid, sA0.account.id, 'MessageMe');
-  console.log(`sent ${receipt0.asset_code} transaction ${abrevIt(receipt0.hash)} created at ${receipt0.created_at} carries memo ${abrevIt(receipt0.memo)} `);
-
-  const waiting = await sA0.watcher.start(sA0, readMessages.bind(sA0));
-  console.log(`SigningAccount ${abrevIt(sA0.account.id)} MessageWatcher found ${waiting.length} message(s) waiting`);
-
-  const sharedData = await sharedKeyTest(sA1, sA0);
+  const sharedData = await sharedKeyTest(sA0, sA1);
   console.log(`finished sharedKeyTest()`);
-  let receipt1 = await sA1.messengerTx(sharedData.cid, sA0.account.id, 'ShareData');
+  let receipt1 = await sA0.messengerTx(sharedData.cid, sA1.account.id, 'ShareData');
   console.log(`sent transaction ${abrevIt(receipt1.hash)} created at ${receipt1.created_at} carries memo ${abrevIt(receipt1.memo)} `);
-
-  // give a little time for the message watcher to process the shared data
-  await new Promise((resolve, reject) => setTimeout(()=>resolve(), 30000));
 }
 
 testCols()
