@@ -153,12 +153,12 @@ async function testCols(){
   const sA1 = await initSigningAccount(TA_1, TS_1);
 
   // create, encrypt and modify related nodes using asymetric keys
-/*if(sA1 instanceof SigningAccount)
+  if(sA1 instanceof SigningAccount)
     await asymetricKeyTest(sA1, sA0);
   else
     throw new Error(`initSigningAccount returned: `, sA1);
   console.log(`finished asymetricKeyTest()`);
-*/
+
   console.log(`encrypting messaging betweenb accounts ${abrevIt(sA1.account.id)} and ${abrevIt(sA0.account.id)}`);
   const pk = await SigningAccount.dataEntry(sA0, 'libsodium_box_pk');
   const message = new COL_Node({colName: 'private message', message:`hi, ${sA0.account.id} at ${new Date().toUTCString()}!`});
@@ -166,17 +166,16 @@ async function testCols(){
   const receipt0 = await sA1.messengerTx(message.cid, sA0.account.id, 'MessageMe');
   console.log(`sent ${receipt0.asset_code} transaction ${abrevIt(receipt0.hash)} created at ${receipt0.created_at} carries memo ${abrevIt(receipt0.memo)} `);
 
-  console.log(`starting message watcher on SigningAccount ${abrevIt(sA0.account.id)}`);
   const waiting = await sA0.watcher.start(sA0, readMessages.bind(sA0));
+  console.log(`SigningAccount ${abrevIt(sA0.account.id)} MessageWatcher found ${waiting.length} message(s) waiting`);
 
-await new Promise((resolve, reject) => setTimeout(()=>resolve(), 30000));
-throw new Error(`stop 10`)
   const sharedData = await sharedKeyTest(sA1, sA0);
   console.log(`finished sharedKeyTest()`);
   let receipt1 = await sA1.messengerTx(sharedData.cid, sA0.account.id, 'ShareData');
   console.log(`sent transaction ${abrevIt(receipt1.hash)} created at ${receipt1.created_at} carries memo ${abrevIt(receipt1.memo)} `);
 
-
+  // give a little time for the message watcher to process the shared data
+  await new Promise((resolve, reject) => setTimeout(()=>resolve(), 30000));
 }
 
 testCols()
