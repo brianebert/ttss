@@ -1,13 +1,28 @@
 import {SigningAccount, COL_Node} from "@brianebert/tss";
+import {Keypair, StrKey} from "stellar-base";
 import * as toml from "toml";
 import * as fs from 'fs';
 
+// turn off caching to force ipfs repo reads
 COL_Node.cache.readFrom = false;
+
+// shorten long strings
 function abrevIt(id){
   return `${id.slice(0, 5)}...${id.slice(-5)}`
 }
+
+// test account ids (TA_n) and secret strings (TS_n)
 const {TA_0, TS_0, TA_1, TS_1} = toml.parse(fs.readFileSync('app.toml', 'utf8'));
 
+// make four level graph to test on:
+//       g00
+//       /  \
+//    g10    g11
+//    /  \   /  \
+// g20    g21   g22
+//     \_  |  _/
+//       \ | /
+//        g30
 async function makeGraph(keys){
   // object indices allow direct manipulation of node values
   const g = {};
@@ -27,14 +42,16 @@ async function makeGraph(keys){
 // recursive COL_Node.traverse() displays nodes of graph in reverse depth first order
 async function showGraph(head, keys=null){
   console.log(`starting traversal of graph headed at ${head.cid.toString()}`);
+  // showNode will be called on each node read by COL_Node.traverse()
   function showNode(instance){
-
-    const indent = parseInt(instance.name.slice(1,2));
+    // extract major axis from node name and indent that much
+    const indent = 1 + parseInt(instance.name.slice(1,2));
     for(let i=0; i < indent; i++){
       console.group();
       console.group();
       console.group();
     }
+    // nodes are printed in leaf first order, with the root node at the bottom
     console.log(`node ${instance.name} at ${instance.cid.toString()} contains: `, instance.value);
     for(let i=0; i < indent; i++){
       console.groupEnd();
@@ -43,14 +60,16 @@ async function showGraph(head, keys=null){
     }
   }
   await COL_Node.traverse(head.cid, showNode, keys);
+  console.log(`finished traversal of graph headed at ${head.cid.toString()}`);
 }
 
+// tests encrypted graph write and read for self
 async function asymetricKeyTest(signingAccount){
-  console.log(`testing graph management with asymetric key encryption`);
+  console.log(`building graph for asymetric key test`);
   const wKeys = {reader: signingAccount.ec25519.pk, writer: signingAccount.ec25519.sk};
   const rKeys = {reader: signingAccount.ec25519.sk, writer: signingAccount.ec25519.pk};
   const graph = await makeGraph(wKeys);
-  console.log(`made new graph at head ${graph.g00.cid.toString()}`);
+  console.log(`testing graph management with asymetric key encryption on new graph at head ${graph.g00.cid.toString()}`);
   await showGraph(graph.g00, rKeys);
 
   // change value of leaf node and bubble hash changes to new graph head
@@ -68,13 +87,16 @@ async function asymetricKeyTest(signingAccount){
   return head
 }
 
+// tests encrypted graph write and read with key shared with another account
 async function sharedKeyTest(signingAccount, shareWith){
-  console.log(`testing graph management with shared key encryption`);
+  console.log(`building graph for shared key test`);
   const shk = await signingAccount.sharedKeys(shareWith.account.id, 'libsodium_kx_pk');
   const keys = {shared: shk.tx};
   const graph = await makeGraph(keys);
+  console.log(`testing graph management with shared key encryption on new graph at head ${graph.g00.cid.toString()}`);
   await showGraph(graph.g00, keys);
  
+  // this time do both update and delete without showing graph between states
   let value = Object.assign({}, graph.g30.value);
   value['keyType'] = `shared ${new Date().toUTCString()}`;
   let head = await graph.g30.update(value, keys);
@@ -98,8 +120,8 @@ async function initSigningAccount(address=null, sk=null){
   if(!signingAccount)
     return Promise.resolve(null)
   console.log(`initializing SigningAccount ${abrevIt(signingAccount.account.id)}`);
-  // if sk is not provided, will call wallet to sign key derivation transaction
-  await signingAccount.deriveKeys(sk);
+  // if sk is falsy, will call wallet to sign key derivation transaction
+  await signingAccount.deriveKeys(sk, {asymetric: 'Asymetric', signing: 'Signing', shareKX: 'ShareKX'});
 
   // adds derived ed25519 key to account signers
   let accountState = await signingAccount.addSigner();
@@ -117,18 +139,20 @@ async function initSigningAccount(address=null, sk=null){
   return signingAccount
 }
 
+// uses message token asste_code to determine which cipher to use
+// traverses linked data
 async function readMessages(messages){
   for(const message of messages){
     switch(message.asset_code){
     case 'MessageMe':
       const pk = await SigningAccount.dataEntry(message.from, 'libsodium_box_pk');
       var keys = {reader: this.ec25519.sk, writer: pk};
-      var node = await COL_Node.fromCID(SigningAccount.memoToCID(message.transaction.memo), keys);
+      var node = await COL_Node.read(SigningAccount.memoToCID(message.transaction.memo), keys);
       break;
     case 'ShareData':
       const {rx, tx} = await this.sharedKeys(message.from, 'libsodium_kx_pk');
       var keys = {shared: rx};
-      var node = await COL_Node.fromCID(SigningAccount.memoToCID(message.transaction.memo), keys);
+      var node = await COL_Node.read(SigningAccount.memoToCID(message.transaction.memo), keys);
       break;
     default:
       throw new Error(`wasn't expecting to get here`)
@@ -146,27 +170,40 @@ async function readMessages(messages){
   }
 }
 
+// tests:
+// - management of graph encrypted for self with public/private keys
+// - sending and receiving of short message encrypted from sender to
+//   receiver with public/private keys
+// - management of graph encrypted with key shared between sender and receiver
+// - discovery and processing of unread messages waiting at start of reader
+// - real time processing of incoming messages
 async function testCols(){
+  // need two test accounts to test encryption and messaging
   const sA0 = await initSigningAccount(TA_0, TS_0);
   const sA1 = await initSigningAccount(TA_1, TS_1);
-
   if(!(sA0 instanceof SigningAccount) || !(sA1 instanceof SigningAccount))
     throw new Error(`failed to create signing accounts.`)
 
+  // create a short, private message between accounts and send it from the first account to the second
   const pk = await SigningAccount.dataEntry(sA1, 'libsodium_box_pk');
-  const message = new COL_Node({colName: 'private message', message:`hi, ${abrevIt(sA1.account.id)} at ${new Date().toUTCString()}!`});
+  const message = new COL_Node({colName: 'private message', message:`hi, ${abrevIt(sA1.account.id)}!`});
   const result = await message.write('', {reader: pk, writer: sA0.ec25519.sk});
   const receipt0 = await sA0.messengerTx(message.cid, sA1.account.id, 'MessageMe');
   console.log(`sent transaction ${abrevIt(receipt0.hash)} created at ${receipt0.created_at} carries memo ${abrevIt(receipt0.memo)} `);
 
-  await asymetricKeyTest(sA1, sA0);
+  // keep the receiving account busy while the message travels
+  await asymetricKeyTest(sA1);
   console.log(`finished asymetricKeyTest()`);
   
+  // verify watcher finds and a message waiting and processes it
   const waiting = await sA1.watcher.start(sA1, readMessages);
   console.log(`SigningAccount ${abrevIt(sA1.account.id)} MessageWatcher found ${waiting.length} message(s) waiting`);
 
+  // repeat graph management test with shared key encryption
   const sharedData = await sharedKeyTest(sA0, sA1);
   console.log(`finished sharedKeyTest()`);
+  
+  // send the graph root address to the other account to receive and process in real time
   let receipt1 = await sA0.messengerTx(sharedData.cid, sA1.account.id, 'ShareData');
   console.log(`sent transaction ${abrevIt(receipt1.hash)} created at ${receipt1.created_at} carries memo ${abrevIt(receipt1.memo)} `);
 }
