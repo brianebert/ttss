@@ -19,7 +19,8 @@ import { COL_Node, SigningAccount } from "@brianebert/tss";
 
 ### To use as a module in a Node.js project
 
-1. Write Stellar test account public and secret key strings into a file called app.toml
+1. Write Stellar test account public and secret key strings into a file called app.toml\
+   enter complete key strings for two accounts
 ```shell
 TA_0 = 'G...0'
 TS_0 = 'S...0'
