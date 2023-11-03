@@ -18,5 +18,8 @@
   "dependencies": {
     "@brianebert/tss": "^1.0.0",
     "toml": "^3.0.0"
+  },
+  "devDependencies": {
+    "webpack-cli": "^5.1.4"
   }
 }

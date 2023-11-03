@@ -10,8 +10,17 @@ function abrevIt(id){
   return `${id.slice(0, 5)}...${id.slice(-5)}`
 }
 
-// test account ids (TA_n) and secret strings (TS_n)
-const {TA_0, TS_0, TA_1, TS_1} = toml.parse(fs.readFileSync('app.toml', 'utf8'));
+// two test account ids (TA_[01]) and secret strings (TS_[01]) are required
+if(Object.keys(fs.default).length) // running node
+  var {TA_0, TS_0, TA_1, TS_1} = toml.parse(fs.readFileSync('app.toml', 'utf8'));
+else // get keys from browswer user
+  var {TA_0, TS_0, TA_1, TS_1} = await new Promise((resolve, reject) => 
+      document.getElementById(`keys`).addEventListener('change', (e) => 
+        resolve(JSON.parse(e.target.value))
+      )
+    );
+
+console.log(`TA_0: ${TA_0}, \nTS_0: ${TS_0}, \nTA_1: ${TA_1}, \nTS_1: ${TS_1}`);
 
 // make four level graph to test on:
 //       g00
