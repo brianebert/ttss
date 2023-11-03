@@ -5,10 +5,12 @@ test tss
 
 ### To use as a module in a Node.js project
 
-1. Install it using yarn:
+0. git clone https://github.com/brianebert/ttss.git && cd ttss
+
+1. Install tss using npm:
 
 ```shell
-yarn add stellar-base
+npm i @brianebert/tss --save
 ```
 
 2. require/import it in your JavaScript:
@@ -17,3 +19,11 @@ yarn add stellar-base
 import * as StellarBase from 'stellar-base';
 ```
 
+3. Run test scriot;
+```shell
+npm run test
+```
+or
+```shell
+node testTss.js
+```
