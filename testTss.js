@@ -10,6 +10,12 @@ function abrevIt(id){
   return `${id.slice(0, 10)}...${id.slice(-10)}`
 }
 
+
+Encrypted_Node.source.url = cid => `https://motia.com/ipfs/${cid.toString()}/`;
+// Use result of /block/put as argument to sink.url(cid) to get pinning url
+Encrypted_Node.sink.url = cid => typeof cid === 'string' ? `https://motia.com/api/v1/ipfs/pin/add?arg=${cid}` :
+                          `https://motia.com/api/v1/ipfs/block/put?cid-codec=${Encrypted_Node.codecForCID(cid).name}`;
+
 // two test account ids (TA_[01]) and secret strings (TS_[01]) are required
 if(Object.keys(fs.default).length) // running node
   var {TA_0, TS_0, TA_1, TS_1} = toml.parse(fs.readFileSync('app.toml', 'utf8'));
@@ -40,7 +46,7 @@ console.log(`Using keys\n\tTA_0: ${TA_0}, \n\tTS_0: ${TS_0}, \n\tTA_1: ${TA_1}, 
 async function makeGraph(keys, sA){
   // object indices allow direct manipulation of node values
   const g = {};
-  g['g30'] = await new Encrypted_Node({'colName': 'g30'}, sA);
+  g['g30'] = await new Encrypted_Node({'colName': 'g30'}, sA).write('g30', keys);
   g['g20'] = await new Encrypted_Node({'colName': 'g20'}, sA).insert(g['g30'], 'g30', keys);
   g['g21'] = await new Encrypted_Node({'colName': 'g21'}, sA).insert(g['g30'], 'g30', keys);
   g['g22'] = await new Encrypted_Node({'colName': 'g22'}, sA).insert(g['g30'], 'g30', keys);
@@ -130,7 +136,7 @@ async function sharedKeyTest(signingAccount, shareWith){
 async function initSigningAccount(address=null, sk=null){
   // if sk is falsy, will call wallet to sign key derivation transaction
   const signingAccount = await Encrypted_Node.SigningAccount.checkForWallet(address, sk); await signingAccount.ready;
-  console.log(`initializing SigningAccount ${abrevIt(signingAccount.account.id)} with signing keys: `, signingAccount.ed25519);
+  console.log(`initializing SigningAccount ${abrevIt(signingAccount.account.id)}`);
 
   if(signingAccount.canSign)
     // adds derived ed25519 key to account signers
@@ -206,7 +212,7 @@ async function testCols(){
   console.log(`finished asymetricKeyTest()`);
   
   // verify watcher finds and a message waiting and processes it
-  const waiting = await sA1.watcher.start(sA1, readMessages.bind(sA1));
+  const waiting = await sA1.watcher.start(sA1, readMessages);
   console.log(`SigningAccount ${abrevIt(sA1.account.id)} MessageWatcher found ${waiting.length} message(s) waiting`);
 
   // repeat graph management test with shared key encryption
