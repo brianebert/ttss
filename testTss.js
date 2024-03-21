@@ -47,15 +47,19 @@ async function makeGraph(keys, sA){
   // object indices allow direct manipulation of node values
   const g = {};
   g['g30'] = await new Encrypted_Node({'colName': 'g30'}, sA).write('g30', keys);
+
   g['g20'] = await new Encrypted_Node({'colName': 'g20'}, sA).insert(g['g30'], 'g30', keys);
   g['g21'] = await new Encrypted_Node({'colName': 'g21'}, sA).insert(g['g30'], 'g30', keys);
   g['g22'] = await new Encrypted_Node({'colName': 'g22'}, sA).insert(g['g30'], 'g30', keys);
-  g['g10'] = await new Encrypted_Node({'colName': 'g10'}, sA).insert(g['g20'], 'g20', keys);
-  g['g11'] = await new Encrypted_Node({'colName': 'g11'}, sA).insert(g['g21'], 'g21', keys);
-  g['g10'] = await g['g10'].insert(g['g21'], 'g21', keys);
-  g['g11'] = await g['g11'].insert(g['g22'], 'g22', keys);
-  g['g00'] = await new Encrypted_Node({'colName': 'g00'}, sA).insert(g['g10'], 'g10', keys);
-  g['g00'] = await g['g00'].insert(g['g11'], 'g11', keys);
+
+  g['g10'] = await new Encrypted_Node({'colName': 'g10'}, sA).insert(g['g20'], 'g20', keys)
+                                                             .then(node => node.insert(g['g21'], 'g21', keys));
+  g['g11'] = await new Encrypted_Node({'colName': 'g11'}, sA).insert(g['g21'], 'g21', keys)
+                                                             .then(node => node.insert(g['g22'], 'g22', keys));
+
+  g['g00'] = await new Encrypted_Node({'colName': 'g00'}, sA).insert(g['g10'], 'g10', keys)
+                                                             .then(node => node.insert(g['g11'], 'g11', keys));
+
   return g
 }
 
@@ -73,8 +77,10 @@ async function showGraph(head, keys=null, logNodeValue=false){
     }
     // nodes are printed in leaf first order, with the root node at the bottom
     console.log(`node ${instance.name} at ${abrevIt(instance.cid.toString())}`,
-                !logNodeValue && Object.hasOwn(instance.value, 'keyType') ? ` has keyType set to ${instance.value.keyType} ` : ' ',
-                logNodeValue ? instance.value : '');
+                !logNodeValue && Object.hasOwn(instance.value, 'keyType') ? 
+                ` has keyType set to ${instance.value.keyType} ` : ' ');
+    for(const [name, cid] of Object.entries(instance.links))
+      console.log(`\t${instance.name} links to ${name} at ${abrevIt(cid.toString())}`);
     for(let i=0; i < indent; i++){
       console.groupEnd();
       console.groupEnd();
@@ -82,7 +88,7 @@ async function showGraph(head, keys=null, logNodeValue=false){
     }
   }
   await Encrypted_Node.traverse(head.cid, showNode, keys);
-  console.log(`finished traversal of graph headed at ${head.name}`);
+  console.log(`finished traversal of graph headed at ${head.cid.toString()}`);
 }
 
 // tests encrypted graph write and read for self
@@ -100,7 +106,7 @@ async function asymetricKeyTest(signingAccount){
   let head = await graph.g30.update(value, wKeys);
   console.log(`updated graph to head ${head.cid.toString()}`);
   await showGraph(head, rKeys);
-
+throw new Error(`Far enough for now`)
   // delete a node and bubble hash changes to new graph head
   head = await graph.g20.delete(wKeys);
   console.log(`updated graph to head ${head.cid.toString()}`);
@@ -199,7 +205,7 @@ async function testCols(){
   const sA1 = await initSigningAccount(TA_1, TS_1);
   if(!(sA0 instanceof Encrypted_Node.SigningAccount) || !(sA1 instanceof Encrypted_Node.SigningAccount))
     throw new Error(`failed to create signing accounts.`)
-
+await asymetricKeyTest(sA1);
   // create a short, private message between accounts and send it from the first account to the second
   const pk = await Encrypted_Node.SigningAccount.dataEntry(sA1, 'libsodium_box_pk');
   const message = await new Encrypted_Node({colName: 'private message', message:`hi, ${abrevIt(sA1.account.id)}!`}, sA0)
