@@ -70,30 +70,21 @@ async function makeGraph(keys, sA){
 
 // recursive COL_Node.traverse() displays nodes of graph in reverse depth first order
 async function showGraph(head, keys=null, logNodeValue=false){
-  console.log(`starting traversal of graph headed at ${head.cid.toString()}`);
+  console.log(`showGraph() is starting traversal of graph headed at ${head.cid.toString()}`);
   // showNode will be called on each node read by COL_Node.traverse()
   async function showNode(instance){
     // extract major axis from node name and indent that much
-    const indent = 1 + parseInt(instance.name.slice(1,2));
-    for(let i=0; i < indent; i++){
-      console.group();
-      console.group();
-      console.group();
-    }
+    const indent = "\t".repeat(parseInt(instance.name.slice(1,2)));
+
     // nodes are printed in leaf first order, with the root node at the bottom
-    console.log(`node ${instance.name} at ${abrevIt(instance.cid.toString())}`,
+    console.log(`${indent}node ${instance.name} at ${abrevIt(instance.cid.toString())}`,
                 !logNodeValue && Object.hasOwn(instance.value, 'keyType') ? 
                 ` has keyType set to ${instance.value.keyType} ` : ' ');
     for(const [name, cid] of Object.entries(instance.links))
-      console.log(`\t${instance.name} links to ${name} at ${abrevIt(cid.toString())}`);
-    for(let i=0; i < indent; i++){
-      console.groupEnd();
-      console.groupEnd();
-      console.groupEnd();
-    }
+      console.log(`${indent} - links to ${name} at ${abrevIt(cid.toString())}`);
   }
   await Encrypted_Node.traverse(head.cid, showNode, keys);
-  console.log(`finished traversal of graph headed at ${head.cid.toString()}`);
+  console.log(`showGraph() has finished traversal of graph headed at ${head.cid.toString()}`);
 }
 
 // tests encrypted graph write and read for self
