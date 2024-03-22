@@ -32,7 +32,7 @@ else // get keys from browswer user
       })
     );
 
-console.log(`Using keys\n\tTA_0: ${TA_0}, \n\tTS_0: ${TS_0}, \n\tTA_1: ${TA_1}, \n\tTS_1: ${TS_1}`);
+console.log(`Using keys\n\tTA_0: ${abrevIt(TA_0)}, \n\tTS_0: S..., \n\tTA_1: ${abrevIt(TA_1)}, \n\tTS_1: S...`);
 
 // make four level graph to test on:
 //       g00
@@ -201,8 +201,7 @@ async function testCols(){
   const sA1 = await initSigningAccount(TA_1, TS_1);
   if(!(sA0 instanceof Encrypted_Node.SigningAccount) || !(sA1 instanceof Encrypted_Node.SigningAccount))
     throw new Error(`failed to create signing accounts.`)
-//await asymetricKeyTest(sA1);
-//throw new Error(`Enough for now`)
+
   // create a short, private message between accounts and send it from the first account to the second
   const pk = await Encrypted_Node.SigningAccount.dataEntry(sA1, 'libsodium_box_pk');
   const message = await new Encrypted_Node({colName: 'private message', message:`hi, ${abrevIt(sA1.account.id)}!`}, sA0)
