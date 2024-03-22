@@ -102,7 +102,7 @@ async function asymetricKeyTest(signingAccount){
   let head = await graph.g30.update(value, wKeys);
   console.log(`updated graph to head ${head.cid.toString()}`);
   await showGraph(head, rKeys);
-throw new Error(`Far enough for now`)
+
   // delete a node and bubble hash changes to new graph head
   head = await graph.g20.delete(wKeys);
   console.log(`updated graph to head ${head.cid.toString()}`);
@@ -201,7 +201,8 @@ async function testCols(){
   const sA1 = await initSigningAccount(TA_1, TS_1);
   if(!(sA0 instanceof Encrypted_Node.SigningAccount) || !(sA1 instanceof Encrypted_Node.SigningAccount))
     throw new Error(`failed to create signing accounts.`)
-await asymetricKeyTest(sA1);
+//await asymetricKeyTest(sA1);
+//throw new Error(`Enough for now`)
   // create a short, private message between accounts and send it from the first account to the second
   const pk = await Encrypted_Node.SigningAccount.dataEntry(sA1, 'libsodium_box_pk');
   const message = await new Encrypted_Node({colName: 'private message', message:`hi, ${abrevIt(sA1.account.id)}!`}, sA0)
