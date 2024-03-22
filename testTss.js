@@ -48,10 +48,15 @@ async function makeGraph(keys, sA){
   const g = {};
   g['g30'] = await new Encrypted_Node({'colName': 'g30'}, sA).write('g30', keys);
 
-  g['g20'] = await new Encrypted_Node({'colName': 'g20'}, sA).insert(g['g30'], 'g30', keys);
-  g['g21'] = await new Encrypted_Node({'colName': 'g21'}, sA).insert(g['g30'], 'g30', keys);
-  g['g22'] = await new Encrypted_Node({'colName': 'g22'}, sA).insert(g['g30'], 'g30', keys);
+  g['g20'] = await new Encrypted_Node({'colName': 'g20'}, sA).insert([g['g30']], keys);
+  g['g21'] = await new Encrypted_Node({'colName': 'g21'}, sA).insert([g['g30']], keys);
+  g['g22'] = await new Encrypted_Node({'colName': 'g22'}, sA).insert([g['g30']], keys);
 
+  g['g10'] = await new Encrypted_Node({'colName': 'g10'}, sA).insert([g['g20'], g['g21']], keys);
+  g['g11'] = await new Encrypted_Node({'colName': 'g11'}, sA).insert([g['g21'], g['g22']], keys);
+
+  g['g00'] = await new Encrypted_Node({'colName': 'g00'}, sA).insert([g['g10'], g['g11']], keys);
+/*
   g['g10'] = await new Encrypted_Node({'colName': 'g10'}, sA).insert(g['g20'], 'g20', keys)
                                                              .then(node => node.insert(g['g21'], 'g21', keys));
   g['g11'] = await new Encrypted_Node({'colName': 'g11'}, sA).insert(g['g21'], 'g21', keys)
@@ -59,7 +64,7 @@ async function makeGraph(keys, sA){
 
   g['g00'] = await new Encrypted_Node({'colName': 'g00'}, sA).insert(g['g10'], 'g10', keys)
                                                              .then(node => node.insert(g['g11'], 'g11', keys));
-
+*/
   return g
 }
 
