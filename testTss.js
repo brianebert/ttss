@@ -11,10 +11,12 @@ function abrevIt(id){
 }
 
 
-Encrypted_Node.source.url = cid => `https://motia.com/ipfs/${cid.toString()}/`;
+/*
+Encrypted_Node.source.url = cid => `https://<<your ipfs gateway>>/${cid.toString()}/`;
 // Use result of /block/put as argument to sink.url(cid) to get pinning url
-Encrypted_Node.sink.url = cid => typeof cid === 'string' ? `https://motia.com/api/v1/ipfs/pin/add?arg=${cid}` :
-                          `https://motia.com/api/v1/ipfs/block/put?cid-codec=${Encrypted_Node.codecForCID(cid).name}`;
+Encrypted_Node.sink.url = cid => typeof cid === 'string' ? `https://<<your ipfs rpc api>>/pin/add?arg=${cid}` :
+                          `https://<<your ipfs rpc api>>/block/put?cid-codec=${Encrypted_Node.codecForCID(cid).name}`;
+*/
 
 // two test account ids (TA_[01]) and secret strings (TS_[01]) are required
 if(Object.keys(fs.default).length) // running node
@@ -56,21 +58,12 @@ async function makeGraph(keys, sA){
   g['g11'] = await new Encrypted_Node({'colName': 'g11'}, sA).insert([g['g21'], g['g22']], keys);
 
   g['g00'] = await new Encrypted_Node({'colName': 'g00'}, sA).insert([g['g10'], g['g11']], keys);
-/*
-  g['g10'] = await new Encrypted_Node({'colName': 'g10'}, sA).insert(g['g20'], 'g20', keys)
-                                                             .then(node => node.insert(g['g21'], 'g21', keys));
-  g['g11'] = await new Encrypted_Node({'colName': 'g11'}, sA).insert(g['g21'], 'g21', keys)
-                                                             .then(node => node.insert(g['g22'], 'g22', keys));
 
-  g['g00'] = await new Encrypted_Node({'colName': 'g00'}, sA).insert(g['g10'], 'g10', keys)
-                                                             .then(node => node.insert(g['g11'], 'g11', keys));
-*/
   return g
 }
 
 // recursive COL_Node.traverse() displays nodes of graph in reverse depth first order
 async function showGraph(head, keys=null, logNodeValue=false){
-  console.log(`showGraph() is starting traversal of graph headed at ${head.cid.toString()}`);
   // showNode will be called on each node read by COL_Node.traverse()
   async function showNode(instance){
     // extract major axis from node name and indent that much
@@ -84,10 +77,12 @@ async function showGraph(head, keys=null, logNodeValue=false){
       console.log(`${indent} - links to ${name} at ${abrevIt(cid.toString())}`);
   }
   await Encrypted_Node.traverse(head.cid, showNode, keys);
-  console.log(`showGraph() has finished traversal of graph headed at ${head.cid.toString()}`);
 }
 
 // tests encrypted graph write and read for self
+// THIS FUNCTION IS NOT CALLED IN DEFAULT TEST
+// BECAUSE SENDING AN ENCRYPTED MESSAGE TESTS
+// ASYMMETRIC ENCRYPTION
 async function asymetricKeyTest(signingAccount){
   console.log(`building graph for asymetric key test`);
   const wKeys = {reader: signingAccount.ec25519.pk, writer: signingAccount.ec25519.sk};
@@ -100,12 +95,10 @@ async function asymetricKeyTest(signingAccount){
   let value = Object.assign({}, graph.g30.value);
   value['keyType'] = `asymetric ${new Date().toUTCString()}`;
   let head = await graph.g30.update(value, wKeys);
-  console.log(`updated graph to head ${head.cid.toString()}`);
   await showGraph(head, rKeys);
 
   // delete a node and bubble hash changes to new graph head
   head = await graph.g20.delete(wKeys);
-  console.log(`updated graph to head ${head.cid.toString()}`);
   await showGraph(head, rKeys);
 
   return head
@@ -113,22 +106,27 @@ async function asymetricKeyTest(signingAccount){
 
 // tests encrypted graph write and read with key shared with another account
 async function sharedKeyTest(signingAccount, shareWith){
-  console.log(`building graph for shared key test`);
   const {rx, tx} = await signingAccount.keys.sharedWith(shareWith.account.id, 'libsodium_kx_pk');
+  console.log(`${abrevIt(signingAccount.id)} is creating a DAG to test link management with shared key encryption`);
   const graph = await makeGraph({shared: tx}, signingAccount);
-  console.log(`testing graph management with shared key encryption on new graph at head ${graph.g00.cid.toString()}`);
+  console.log(`created a new graph with head ${graph.g00.cid.toString()}`);
+  console.log(`\n${abrevIt(signingAccount.id)} is starting traversal of graph headed at ${graph.g00.cid.toString()}`);
   await showGraph(graph.g00, {shared: tx});
+  console.log(`finished traversal of graph headed at ${graph.g00.cid.toString()}\n`);
  
-  // this time do both update and delete without showing graph between states
   let value = Object.assign({}, graph.g30.value);
   value['keyType'] = `shared ${new Date().toUTCString()}`;
   let head = await graph.g30.update(value, {shared: tx});
-  console.log(`updated graph to head ${head.cid.toString()}`);
+  console.log(`you should see address changes ripple through every node of the graph.`);
+  console.log(`\n${abrevIt(signingAccount.id)} is starting traversal of graph headed at ${head.cid.toString()}`);
   await showGraph(head, {shared: tx});
+  console.log(`finished traversal of graph headed at ${head.cid.toString()}\n`);
 
   head = await graph.g20.delete({shared: tx});
-  console.log(`updated graph to head ${head.cid.toString()}`);
+  console.log(`note how deleting node g20 only required updates to two ancestors.`);
+  console.log(`\n${abrevIt(signingAccount.id)} is starting traversal of graph headed at ${head.cid.toString()}`);
   await showGraph(head, {shared: tx});
+  console.log(`finished traversal of graph headed at ${head.cid.toString()}\n`);
 
   return head
 }
@@ -138,7 +136,12 @@ async function sharedKeyTest(signingAccount, shareWith){
 async function initSigningAccount(address=null, sk=null){
   // if sk is falsy, will call wallet to sign key derivation transaction
   const signingAccount = await Encrypted_Node.SigningAccount.checkForWallet(address, sk); await signingAccount.ready;
-  console.log(`initializing SigningAccount ${abrevIt(signingAccount.account.id)}`);
+  console.log(`\ninitializing SigningAccount ${abrevIt(signingAccount.id)}`);
+  console.log(`you may see multiple "waiting for Stellar Consensus" lines while your test accounts are configured with data entries`);
+  console.log(`for public keys libsodium_box_pk and libsodium_kx_pk, which allow people to address you with public/private key encryption`);
+  console.log(`or shared key exchange, and market offers for "MesssageMe" and "SharedData" tokens which people can buy and return to you`);
+  console.log(`with pointers to their message or data root attached. If your account is missing any of those, a Stellar transaction will`);
+  console.log(`be called to set each missing value`)
 
   if(signingAccount.canSign)
     // adds derived ed25519 key to account signers
@@ -154,6 +157,8 @@ async function initSigningAccount(address=null, sk=null){
   for(let token of ['MessageMe', 'ShareData']){
     await Encrypted_Node.SigningAccount.sellOffer(signingAccount, {selling: token});
   }
+
+  console.log(`${abrevIt(signingAccount.id)} has been initialized\n`);
   return signingAccount
 }
 
@@ -179,12 +184,16 @@ async function readMessages(messages){
     for(const key of Object.keys(links))
       if(key.endsWith('_last'))
         delete links[key];
+    console.group();
     if(Object.keys(links).length){
-      console.log(`traversing message from ${abrevIt(message.from)} at ${node.cid.toString()}`);
+      console.log(`${abrevIt(this.id)} found a DAG root from ${abrevIt(message.from)} at ${abrevIt(node.cid.toString())}.`);
+      console.log(`${abrevIt(this.id)} is starting traversal of graph headed at ${node.cid.toString()}`);
       await showGraph(node, keys);
+      console.log(`finished traversal of graph headed at ${node.cid.toString()}`);
     }
     else 
-      console.log(`node ${node.name} at ${abrevIt(node.cid.toString())} contains: `, node.value);
+      console.log(`${abrevIt(this.id)} found message from ${abrevIt(message.from)} at ${abrevIt(node.cid.toString())} containing`, node.value);
+    console.groupEnd();
   }
 }
 
@@ -203,27 +212,29 @@ async function testCols(){
     throw new Error(`failed to create signing accounts.`)
 
   // create a short, private message between accounts and send it from the first account to the second
+  console.log(`\ncreating a private message from ${abrevIt(sA0.id)} to ${abrevIt(sA1.id)} encrypted with libsodium crypto_box_easy. the message`);
+  console.log(`is added to ipfs and its address sent to its recipient attached to a MessageMe token payment in the transaction memo`);
   const pk = await Encrypted_Node.SigningAccount.dataEntry(sA1, 'libsodium_box_pk');
   const message = await new Encrypted_Node({colName: 'private message', message:`hi, ${abrevIt(sA1.account.id)}!`}, sA0)
                             .write('', {reader: pk, writer: sA0.ec25519.sk});
   const receipt0 = await sA0.messengerTx(message.cid, sA1.account.id, 'MessageMe');
-  console.log(`sent transaction ${abrevIt(receipt0.hash)} created at ${receipt0.created_at} carries memo ${abrevIt(receipt0.memo)} `);
-
-  // keep the receiving account busy while the message travels
-  await asymetricKeyTest(sA1);
-  console.log(`finished asymetricKeyTest()`);
+  console.log(`sent transaction ${receipt0.hash} carrying message ${abrevIt(message.cid.toString())} `);
   
   // verify watcher finds and a message waiting and processes it
   const waiting = await sA1.watcher.start(sA1, readMessages);
-  console.log(`SigningAccount ${abrevIt(sA1.account.id)} MessageWatcher found ${waiting.length} message(s) waiting`);
+  console.log(`${abrevIt(sA1.id)}'s MessageWatcher started and found ${waiting.length} message(s) waiting. while ${abrevIt(sA1.id)} marks its`);
+  console.log(`message queue with a "MessagesRead" token, ${abrevIt(sA0.id)} will start testing DAG link maintenance. we'll hear more from`);
+  console.log(`${abrevIt(sA1.id)} asynchronously processes messages waiting or as they arrive. ${abrevIt(sA1.id)}'s MessageWatcher will continue`);
+  console.log(`waiting for more messages, so this program will not end until you terminate it. I hope you've enjoyed running this code! BE`);
 
   // repeat graph management test with shared key encryption
+  console.log(`\n${abrevIt(sA0.id)} is going to test tss link maintenance for a graph encrypted with a key shared with ${abrevIt(sA1.id)}`);
   const sharedData = await sharedKeyTest(sA0, sA1);
-  console.log(`finished sharedKeyTest()`);
   
   // send the graph root address to the other account to receive and process in real time
+  console.log(`\n${abrevIt(sA0.id)} will send the graph's root address to ${abrevIt(sA1.id)} in the transaction memo of a ShareData token payment`);
   let receipt1 = await sA0.messengerTx(sharedData.cid, sA1.account.id, 'ShareData');
-  console.log(`sent transaction ${abrevIt(receipt1.hash)} created at ${receipt1.created_at} carries memo ${abrevIt(receipt1.memo)} `);
+  console.log(`sent transaction ${receipt1.hash} carrying shared data root address ${abrevIt(sharedData.cid.toString())} `);
 }
 
 testCols()
