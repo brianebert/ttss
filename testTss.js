@@ -10,7 +10,6 @@ function abrevIt(id){
   return `${id.slice(0, 10)}...${id.slice(-10)}`
 }
 
-
 /*
 Encrypted_Node.source.url = cid => `https://<<your ipfs gateway>>/${cid.toString()}/`;
 // Use result of /block/put as argument to sink.url(cid) to get pinning url
@@ -18,9 +17,13 @@ Encrypted_Node.sink.url = cid => typeof cid === 'string' ? `https://<<your ipfs 
                           `https://<<your ipfs rpc api>>/block/put?cid-codec=${Encrypted_Node.codecForCID(cid).name}`;
 */
 
+
 // two test account ids (TA_[01]) and secret strings (TS_[01]) are required
-if(Object.keys(fs.default).length) // running node
+if(Object.keys(fs.default).length){ // running node
+  if(Encrypted_Node.sink.url === false)
+    console.warn(`tss test will write into a ***VOLATILE localStorage*** object.`, localStorage);
   var {TA_0, TS_0, TA_1, TS_1} = toml.parse(fs.readFileSync('app.toml', 'utf8'));
+}
 else // get keys from browswer user
   var {TA_0, TS_0, TA_1, TS_1} = await new Promise((resolve, reject) => 
       document.getElementById(`keys`).addEventListener('change', (e) => {
