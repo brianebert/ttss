@@ -19,26 +19,22 @@ Encrypted_Node.sink.url = cid => typeof cid === 'string' ? `https://<<your ipfs 
 
 
 // two test account ids (TA_[01]) and secret strings (TS_[01]) are required
-if(Object.keys(fs.default).length){ // running node
-  if(Encrypted_Node.sink.url === false)
-    console.warn(`tss test will write into a ***VOLATILE localStorage*** object.`, localStorage);
-  var {TA_0, TS_0, TA_1, TS_1} = toml.parse(fs.readFileSync('app.toml', 'utf8'));
+if(new Function("try {return this===window;}catch(e){ return false;}")()){
+  console.log(`found myself in a browser`);
+  var keyString = prompt("Please copy the contents of your app.conf file here.", "");
 }
-else // get keys from browswer user
-  var {TA_0, TS_0, TA_1, TS_1} = await new Promise((resolve, reject) => 
-      document.getElementById(`keys`).addEventListener('change', (e) => {
-        resolve( // creates an object from app.toml strings pasted into text area
-          Object.fromEntries(
-            e.target.value.trim().split('\n')
-             .map(line => line.trim().split('='))
-             .map(entry => [entry[0].trim(), entry[1].replace(/[ ']/g, "")])
-          )
-        )
-      })
-    );
-
+else { // running node
+  if(Encrypted_Node.sink.url === false)
+    console.warn(`testTss will write into a ***VOLATILE*** localStorage object!!`);
+  var keyString = fs.readFileSync('app.conf', 'utf8');
+}
+const {TA_0, TS_0, TA_1, TS_1} = JSON.parse(keyString);
 console.log(`Using keys\n\tTA_0: ${abrevIt(TA_0)}, \n\tTS_0: S..., \n\tTA_1: ${abrevIt(TA_1)}, \n\tTS_1: S...`);
 
+// makeGraph(keys, sA)
+//    keys: optional shared or asymetric keys to encrypt graph with
+//    sA: required SigningAccount for use by Encrypted_Nodes
+//
 // make four level graph to test on:
 //       g00
 //       /  \
@@ -113,23 +109,23 @@ async function sharedKeyTest(signingAccount, shareWith){
   console.log(`${abrevIt(signingAccount.id)} is creating a DAG to test link management with shared key encryption`);
   const graph = await makeGraph({shared: tx}, signingAccount);
   console.log(`created a new graph with head ${graph.g00.cid.toString()}`);
-  console.log(`\n${abrevIt(signingAccount.id)} is starting traversal of graph headed at ${graph.g00.cid.toString()}`);
+  console.log(`\nGRAPH 1: ${abrevIt(signingAccount.id)} is starting traversal of graph headed at ${graph.g00.cid.toString()}`);
   await showGraph(graph.g00, {shared: tx});
-  console.log(`finished traversal of graph headed at ${graph.g00.cid.toString()}\n`);
+  console.log(`finished traversal of GRAPH 1 headed at ${graph.g00.cid.toString()}\n`);
  
   let value = Object.assign({}, graph.g30.value);
   value['keyType'] = `shared ${new Date().toUTCString()}`;
   let head = await graph.g30.update(value, {shared: tx});
   console.log(`you should see address changes ripple through every node of the graph.`);
-  console.log(`\n${abrevIt(signingAccount.id)} is starting traversal of graph headed at ${head.cid.toString()}`);
+  console.log(`\nGRAPH 2: ${abrevIt(signingAccount.id)} is starting traversal of graph headed at ${head.cid.toString()}`);
   await showGraph(head, {shared: tx});
-  console.log(`finished traversal of graph headed at ${head.cid.toString()}\n`);
+  console.log(`finished traversal of GRAPH 2 headed at ${head.cid.toString()}\n`);
 
   head = await graph.g20.delete({shared: tx});
   console.log(`note how deleting node g20 only required updates to two ancestors.`);
-  console.log(`\n${abrevIt(signingAccount.id)} is starting traversal of graph headed at ${head.cid.toString()}`);
+  console.log(`\nGRAPH 3: ${abrevIt(signingAccount.id)} is starting traversal of graph headed at ${head.cid.toString()}`);
   await showGraph(head, {shared: tx});
-  console.log(`finished traversal of graph headed at ${head.cid.toString()}\n`);
+  console.log(`finished traversal of GRAPH 3 headed at ${head.cid.toString()}\n`);
 
   return head
 }
@@ -144,8 +140,12 @@ async function initSigningAccount(address=null, sk=null){
   console.log(`for public keys libsodium_box_pk and libsodium_kx_pk, which allow people to address you with public/private key encryption`);
   console.log(`or shared key exchange, and market offers for "MesssageMe" and "SharedData" tokens which people can buy and return to you`);
   console.log(`with pointers to their message or data root attached. If your account is missing any of those, a Stellar transaction will`);
-  console.log(`be called to set each missing value`)
-
+  console.log(`be called to set each missing value. If you received your account keys from https://tryipfs.io/testAccounts, each of your`);
+  console.log(`testAccounts will write its public keys for asymetric encryption and shared key exchange. To see any transaction submitted`);
+  console.log(`by testTss.js, copy the base64 string of each line following "submitting XDR: " and copy it into the textarea at`);
+  console.log(`https://laboratory.stellar.org/#xdr-viewer?type=TransactionEnvelope&network=public and scroll down to read the decoded`);
+  console.log(`transaction`);
+  console.log(`working with signingAccount `, signingAccount.account);
   if(signingAccount.canSign)
     // adds derived ed25519 key to account signers
     await signingAccount.addSigner();

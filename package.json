@@ -16,9 +16,9 @@
   "author": "Brian Ebert",
   "license": "ISC",
   "dependencies": {
-    "@brianebert/tss": "^1.0.0",
-    "path-browserify": "^1.0.1",
+    "@brianebert/tss": "^1.1.4",
     "buffer": "^6.0.3",
+    "path-browserify": "^1.0.1",
     "toml": "^3.0.0"
   },
   "devDependencies": {
