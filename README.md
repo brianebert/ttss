@@ -17,6 +17,7 @@ npm i
 ```shell
 curl https://tryipfs.io/testAccounts > app.conf
 ```
+> The first time you call /testAccounts there is a delay before the server responds with your account numbers.
 
 ### To use as a module in a Node.js project
 1. Run test scriot;
